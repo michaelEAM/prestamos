@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Control de Préstamos - Supabase</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+    input, button { padding: 8px; margin: 3px 0; font-size: 14px; }
+    button { cursor: pointer; border-radius: 3px; border: 1px solid #ccc; background: #337ab7; color: white; }
+    button:hover { opacity: 0.9; }
+    ul { list-style: none; padding: 0; }
+    li { background: #fff; padding: 15px; margin-bottom: 10px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .destacado { color: #d9534f; font-weight: bold; }
+    .pagado { color: #5cb85c; font-weight: bold; }
+    hr { border: none; border-top: 1px solid #ddd; margin: 10px 0; }
+    .form-group { margin: 5px 0; }
+    #mensaje { padding: 10px; margin: 10px 0; border-radius: 4px; display: none; }
+    .exito { background: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; }
+    .error { background: #f2dede; color: #a94442; border: 1px solid #ebccd1; }
+    .config-box { background: #fff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ddd; }
+
+    /* Login styles */
+    #loginScreen {
+      max-width: 400px;
+      margin: 80px auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      text-align: center;
+    }
+    #loginScreen h2 { margin-bottom: 20px; color: #333; }
+    #loginScreen input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    #loginScreen button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      background: #5cb85c;
+      border: none;
+      font-size: 16px;
+    }
+    #loginScreen button:hover { background: #4cae4c; }
+    #loginError {
+      color: #d9534f;
+      margin-top: 10px;
+      display: none;
+    }
+    #appContent { display: none; }
+    #barraSuperior {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #fff;
+      padding: 10px 20px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    #btnCerrarSesion {
+      background: #d9534f;
+      border: none;
+      padding: 8px 16px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================ -->
+<!-- PANTALLA DE LOGIN -->
+<!-- ============================================ -->
+<div id="loginScreen">
+  <h2>🔒 Control de Préstamos</h2>
+  <p>Ingresa tus credenciales para acceder</p>
+  <input type="text" id="loginUser" placeholder="Usuario"><br>
+  <input type="password" id="loginPass" placeholder="Contraseña"><br>
+  <button onclick="iniciarSesion()">Ingresar</button>
+  <div id="loginError">Usuario o contraseña incorrectos</div>
+  <p style="font-size: 12px; color: #888; margin-top: 15px;">
+    <strong>Datos de acceso:</strong><br>
+    Usuario: <code>admin</code> | Contraseña: <code>admin2024</code>
+  </p>
+</div>
+
+<!-- ============================================ -->
+<!-- CONTENIDO DE LA APP (oculto hasta login) -->
+<!-- ============================================ -->
+<div id="appContent">
+
+  <div id="barraSuperior">
+    <span><strong>Control de Préstamos</strong> — Sesión activa</span>
+    <button id="btnCerrarSesion" onclick="cerrarSesion()">Cerrar Sesión</button>
+  </div>
+
+  <h2>Configuración de Supabase</h2>
+  <div class="config-box">
+    <div class="form-group">
+      <label>URL de Supabase:</label><br>
+      <input type="text" id="supabaseUrl" value="https://iyyxrpscdwtybvwjqvgx.supabase.co" style="width:350px;">
+    </div>
+    <div class="form-group">
+      <label>Anon Key:</label><br>
+      <input type="text" id="supabaseKey" value="sb_publishable_dJ_Z9ZZx2Xxs9DTu7nUpEw_Qy2tusbx" style="width:450px;">
+    </div>
+    <button onclick="conectarSupabase()">Conectar a Supabase</button>
+    <p class="small" style="color:#666; font-size:12px;">Si necesitas cambiar las credenciales, edita los campos arriba.</p>
+  </div>
+
+  <h2>Registro de Préstamo</h2>
+
+  <div id="mensaje"></div>
+
+  <div class="form-group"><input type="date" id="fechaPrestamo"></div>
+  <div class="form-group"><input type="text" id="nombre" placeholder="Nombre"></div>
+  <div class="form-group"><input type="text" id="cedula" placeholder="Cédula"></div>
+  <div class="form-group"><input type="number" id="monto" placeholder="Monto del préstamo" min="0" step="0.01" oninput="calcularValorCuota()"></div>
+  <div class="form-group"><input type="number" id="cuotas" placeholder="Número de cuotas" min="1" oninput="calcularValorCuota()"></div>
+  <div class="form-group"><input type="number" id="valorCuota" placeholder="Valor por cuota" min="0" step="0.01"></div>
+  <div class="form-group"><input type="text" id="motivo" placeholder="Para qué se prestó"></div>
+  <br>
+  <button onclick="guardarPrestamo()">Guardar Préstamo</button>
+
+  <h2>Lista de Préstamos</h2>
+  <ul id="lista"></ul>
+
+</div>
+
+<!-- Cliente de Supabase vía CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+// ============================================
+// LOGIN QUEMADO (HARDCODEADO)
+// ============================================
+const USUARIO_VALIDO = 'admin';
+const PASSWORD_VALIDO = 'admin2024';
+
+function iniciarSesion() {
+  let user = document.getElementById('loginUser').value.trim();
+  let pass = document.getElementById('loginPass').value.trim();
+
+  if (user === USUARIO_VALIDO && pass === PASSWORD_VALIDO) {
+    sessionStorage.setItem('sesionActiva', 'true');
+    mostrarApp();
+  } else {
+    document.getElementById('loginError').style.display = 'block';
+  }
+}
+
+function cerrarSesion() {
+  sessionStorage.removeItem('sesionActiva');
+  location.reload();
+}
+
+function mostrarApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appContent').style.display = 'block';
+  // Conectar a Supabase automáticamente al entrar
+  conectarSupabase();
+}
+
+// Verificar sesión al cargar
+if (sessionStorage.getItem('sesionActiva') === 'true') {
+  mostrarApp();
+}
+
+// ============================================
+// CONFIGURACIÓN SUPABASE
+// ============================================
+let supabaseClient = null;
+let prestamos = [];
+
+document.getElementById("fechaPrestamo").value = new Date().toISOString().split('T')[0];
+
+function conectarSupabase() {
+  let url = document.getElementById("supabaseUrl").value.trim();
+  let key = document.getElementById("supabaseKey").value.trim();
+
+  if (!url || !key) {
+    mostrarMensaje("Ingresa la URL y la Anon Key de Supabase.", "error");
+    return;
+  }
+
+  try {
+    supabaseClient = supabase.createClient(url, key);
+    mostrarMensaje("Conectado a Supabase correctamente.", "exito");
+    cargarPrestamos();
+  } catch (e) {
+    console.error(e);
+    mostrarMensaje("Error al conectar con Supabase: " + e.message, "error");
+  }
+}
+
+// ============================================
+// UTILIDADES
+// ============================================
+function mostrarMensaje(texto, tipo) {
+  let div = document.getElementById("mensaje");
+  div.textContent = texto;
+  div.className = tipo === 'exito' ? 'exito' : 'error';
+  div.style.display = 'block';
+  setTimeout(() => { div.style.display = 'none'; }, 4000);
+}
+
+function calcularValorCuota() {
+  let monto = parseFloat(document.getElementById("monto").value);
+  let cuotas = parseInt(document.getElementById("cuotas").value);
+  if (!isNaN(monto) && !isNaN(cuotas) && cuotas > 0) {
+    document.getElementById("valorCuota").value = (monto / cuotas).toFixed(2);
+  }
+}
+
+function escapar(str) {
+  if (str === undefined || str === null) return '';
+  return String(str).replace(/</g, '<').replace(/>/g, '>');
+}
+
+// ============================================
+// CRUD - PRESTAMOS
+// ============================================
+async function cargarPrestamos() {
+  if (!supabaseClient) {
+    mostrarMensaje("Primero conecta a Supabase.", "error");
+    return;
+  }
+
+  try {
+    let { data, error } = await supabaseClient
+      .from('prestamos')
+      .select('*, abonos(*)')
+      .order('id', { ascending: false });
+
+    if (error) throw error;
+
+    prestamos = data || [];
+    mostrarPrestamos();
+  } catch (e) {
+    console.error(e);
+    mostrarMensaje("Error cargando préstamos: " + e.message, "error");
+  }
+}
+
+async function guardarPrestamo() {
+  if (!supabaseClient) {
+    mostrarMensaje("Primero conecta a Supabase.", "error");
+    return;
+  }
+
+  let fechaPrestamo = document.getElementById("fechaPrestamo").value;
+  let nombre = document.getElementById("nombre").value.trim();
+  let cedula = document.getElementById("cedula").value.trim();
+  let monto = parseFloat(document.getElementById("monto").value);
+  let cuotas = parseInt(document.getElementById("cuotas").value);
+  let valorCuota = parseFloat(document.getElementById("valorCuota").value);
+  let motivo = document.getElementById("motivo").value.trim();
+
+  if (!fechaPrestamo || !nombre || !cedula || isNaN(monto) || monto <= 0 || isNaN(cuotas) || cuotas <= 0 || isNaN(valorCuota) || valorCuota <= 0 || !motivo) {
+    mostrarMensaje("Por favor completa todos los campos correctamente.", "error");
+    return;
+  }
+
+  try {
+    let { data, error } = await supabaseClient
+      .from('prestamos')
+      .insert([{
+        nombre: nombre,
+        cedula: cedula,
+        fecha_prestamo: fechaPrestamo,
+        monto: monto,
+        cuotas: cuotas,
+        valor_cuota: valorCuota,
+        motivo: motivo
+      }])
+      .select();
+
+    if (error) throw error;
+
+    // Limpiar formulario
+    document.getElementById("nombre").value = "";
+    document.getElementById("cedula").value = "";
+    document.getElementById("monto").value = "";
+    document.getElementById("cuotas").value = "";
+    document.getElementById("valorCuota").value = "";
+    document.getElementById("motivo").value = "";
+    document.getElementById("fechaPrestamo").value = new Date().toISOString().split('T')[0];
+
+    mostrarMensaje("Préstamo guardado correctamente.", "exito");
+    await cargarPrestamos();
+  } catch (e) {
+    console.error(e);
+    mostrarMensaje("Error al guardar: " + e.message, "error");
+  }
+}
+
+async function eliminarPrestamo(id) {
+  if (!confirm("¿Seguro que deseas eliminar este préstamo?")) return;
+  if (!supabaseClient) return;
+
+  try {
+    let { error } = await supabaseClient
+      .from('prestamos')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    mostrarMensaje("Préstamo eliminado.", "exito");
+    await cargarPrestamos();
+  } catch (e) {
+    console.error(e);
+    mostrarMensaje("Error al eliminar: " + e.message, "error");
+  }
+}
+
+// ============================================
+// CRUD - ABONOS
+// ============================================
+async function agregarAbono(id) {
+  if (!supabaseClient) {
+    mostrarMensaje("Primero conecta a Supabase.", "error");
+    return;
+  }
+
+  let inputCantidad = document.getElementById("abono-" + id);
+  let inputFecha = document.getElementById("fecha-abono-" + id);
+  
+  if (!inputCantidad || !inputFecha) {
+    mostrarMensaje("Error: no se encontraron los campos de abono.", "error");
+    return;
+  }
+  
+  let cantidad = parseInt(inputCantidad.value);
+  let fecha = inputFecha.value;
+
+  if (isNaN(cantidad) || cantidad <= 0) {
+    mostrarMensaje("Ingresa cuántas cuotas vas a pagar.", "error");
+    return;
+  }
+  if (!fecha) {
+    mostrarMensaje("Selecciona la fecha del abono.", "error");
+    return;
+  }
+
+  let prestamo = prestamos.find(p => p.id === id);
+  if (!prestamo) {
+    mostrarMensaje("Préstamo no encontrado.", "error");
+    return;
+  }
+
+  let cuotasPagadas = 0;
+  if (prestamo.abonos) {
+    for (let j = 0; j < prestamo.abonos.length; j++) {
+      cuotasPagadas += (prestamo.abonos[j].cantidad_cuotas || 0);
+    }
+  }
+  
+  let cuotasRestantes = prestamo.cuotas - cuotasPagadas;
+  if (cantidad > cuotasRestantes) {
+    mostrarMensaje("Solo quedan " + cuotasRestantes + " cuota(s) por pagar.", "error");
+    return;
+  }
+
+  try {
+    let { error } = await supabaseClient
+      .from('abonos')
+      .insert([{
+        prestamo_id: id,
+        fecha_abono: fecha,
+        cantidad_cuotas: cantidad
+      }]);
+
+    if (error) throw error;
+
+    mostrarMensaje("Abono registrado correctamente.", "exito");
+    await cargarPrestamos();
+  } catch (e) {
+    console.error(e);
+    mostrarMensaje("Error al registrar abono: " + e.message, "error");
+  }
+}
+
+// ============================================
+// RENDERIZAR LISTA
+// ============================================
+function mostrarPrestamos() {
+  let lista = document.getElementById("lista");
+  lista.innerHTML = "";
+
+  if (prestamos.length === 0) {
+    lista.innerHTML = "<li>No hay préstamos registrados.</li>";
+    return;
+  }
+
+  for (let i = 0; i < prestamos.length; i++) {
+    let p = prestamos[i];
+    
+    let cuotasPagadas = 0;
+    let abonos = p.abonos || [];
+    for (let j = 0; j < abonos.length; j++) {
+      cuotasPagadas += (abonos[j].cantidad_cuotas || 0);
+    }
+    
+    let totalPagado = cuotasPagadas * parseFloat(p.valor_cuota);
+    let saldo = parseFloat(p.monto) - totalPagado;
+    let cuotasRestantes = p.cuotas - cuotasPagadas;
+    if (cuotasRestantes < 0) cuotasRestantes = 0;
+    
+    let estadoClase = saldo <= 0 ? "pagado" : "destacado";
+
+    let historial = "Sin abonos";
+    if (abonos.length > 0) {
+      let partes = [];
+      for (let k = 0; k < abonos.length; k++) {
+        partes.push(abonos[k].fecha_abono + ": " + abonos[k].cantidad_cuotas + " cuota(s)");
+      }
+      historial = partes.join("<br>");
+    }
+
+    let fechaHoy = new Date().toISOString().split('T')[0];
+    
+    let li = document.createElement("li");
+    li.innerHTML = 
+      "<strong>" + escapar(p.nombre) + "</strong> - " + escapar(p.cedula) + "<br>" +
+      "Fecha préstamo: " + escapar(p.fecha_prestamo) + "<br>" +
+      "Motivo: " + escapar(p.motivo) + "<br>" +
+      "Monto: $" + Number(p.monto).toFixed(2) + " | Cuotas: " + p.cuotas + "<br>" +
+      "Valor cuota: $" + Number(p.valor_cuota).toFixed(2) + "<br>" +
+      "Cuotas pagadas: " + cuotasPagadas + " | Restantes: " + cuotasRestantes + "<br>" +
+      "Saldo restante: <span class='" + estadoClase + "'>$" + saldo.toFixed(2) + "</span><br><br>" +
+      "<strong>Abonos:</strong><br>" + historial + "<br><br>" +
+      "<input type='date' id='fecha-abono-" + p.id + "' value='" + fechaHoy + "' style='width:130px;'> " +
+      "<input type='number' id='abono-" + p.id + "' placeholder='Cuotas' min='1' style='width:70px;'> " +
+      "<button onclick='agregarAbono(" + p.id + ")'>Abonar</button> " +
+      "<button onclick='eliminarPrestamo(" + p.id + ")' style='background:#d9534f;color:#fff;border:none;'>Eliminar</button>" +
+      "<hr>";
+
+    lista.appendChild(li);
+  }
+}
+</script>
+
+</body>
+</html>

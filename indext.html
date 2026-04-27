@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Control de Préstamos</title>
+</head>
+<body>
+
+  <h2>Registro de Préstamo</h2>
+
+  <input type="text" id="nombre" placeholder="Nombre"><br><br>
+  <input type="text" id="cedula" placeholder="Cédula"><br><br>
+  <input type="number" id="monto" placeholder="Monto del préstamo"><br><br>
+  <input type="text" id="motivo" placeholder="Para qué se prestó"><br><br>
+  <input type="number" id="cuotas" placeholder="Número de cuotas"><br><br>
+
+  <button onclick="guardarPrestamo()">Guardar</button>
+
+  <h2>Lista de Préstamos</h2>
+  <ul id="lista"></ul>
+
+<script>
+let prestamos = JSON.parse(localStorage.getItem("prestamos")) || [];
+
+function guardarPrestamo() {
+  let nombre = document.getElementById("nombre").value;
+  let cedula = document.getElementById("cedula").value;
+  let monto = document.getElementById("monto").value;
+  let motivo = document.getElementById("motivo").value;
+  let cuotas = document.getElementById("cuotas").value;
+
+  let prestamo = {
+    nombre,
+    cedula,
+    monto,
+    motivo,
+    cuotas,
+    abonos: []
+  };
+
+  prestamos.push(prestamo);
+  localStorage.setItem("prestamos", JSON.stringify(prestamos));
+
+  mostrarPrestamos();
+}
+
+function mostrarPrestamos() {
+  let lista = document.getElementById("lista");
+  lista.innerHTML = "";
+
+  prestamos.forEach((p, index) => {
+    let item = document.createElement("li");
+
+    item.innerHTML = `
+      <strong>${p.nombre}</strong> - ${p.cedula} <br>
+      Monto: $${p.monto} | Cuotas: ${p.cuotas} <br>
+      Abonos: ${p.abonos.join(", ")} <br>
+      <input type="number" id="abono-${index}" placeholder="Agregar abono">
+      <button onclick="agregarAbono(${index})">Abonar</button>
+      <hr>
+    `;
+
+    lista.appendChild(item);
+  });
+}
+
+function agregarAbono(index) {
+  let input = document.getElementById(`abono-${index}`);
+  let valor = input.value;
+
+  if (valor) {
+    prestamos[index].abonos.push(valor);
+    localStorage.setItem("prestamos", JSON.stringify(prestamos));
+    mostrarPrestamos();
+  }
+}
+
+mostrarPrestamos();
+</script>
+
+</body>
+</html>
